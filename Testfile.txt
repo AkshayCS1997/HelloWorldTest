@@ -1,1 +1,444 @@
-Test
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
+
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.UseMiddleware<RateLimitMiddleware>();
+app.MapPost("/register", async (HttpContext http) =>
+{
+    var payload = await http.Request.ReadFromJsonAsync<Dictionary<string, object?>>();
+    if (payload == null)
+    {
+        http.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+        await http.Response.WriteAsJsonAsync(new { error = "invalid payload" });
+        return;
+    }
+
+    var validator = new RegistrationValidator();
+    var result = validator.Validate(payload);
+
+    if (result.Blocked)
+    {
+        http.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+        await http.Response.WriteAsync("This is not a valid input.");
+        return;
+    }
+
+    await http.Response.WriteAsJsonAsync(result);
+});
+
+app.Run();
+
+#region RateLimitMiddleware
+public class RateLimitMiddleware
+{
+    private readonly RequestDelegate _next;
+    private static readonly ConcurrentDictionary<string, (int Count, DateTime ResetAt)> _store = new();
+    private const int WINDOW_SECONDS = 60;
+    private const int MAX_REQUESTS = 10;
+
+    public RateLimitMiddleware(RequestDelegate next) => _next = next;
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        var key = context.Connection.RemoteIpAddress?.ToString() ?? context.Request.Headers["X-Forwarded-For"].FirstOrDefault() ?? "unknown";
+        var now = DateTime.UtcNow;
+        var entry = _store.GetOrAdd(key, _ => (0, now.AddSeconds(WINDOW_SECONDS)));
+        if (now > entry.ResetAt) entry = (0, now.AddSeconds(WINDOW_SECONDS));
+        entry.Count++;
+        _store[key] = entry;
+        if (entry.Count > MAX_REQUESTS)
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+            await context.Response.WriteAsJsonAsync(new { error = "rate_limited", message = "Too many requests" });
+            return;
+        }
+        await _next(context);
+    }
+}
+#endregion
+
+#region Validation Models
+public class ValidationResult
+{
+    public string Field { get; set; } = "";
+    public bool Ok { get; set; }
+    public List<string>? Errors { get; set; }
+    public object? Normalized { get; set; }
+}
+
+public class RegistrationValidationResponse
+{
+    public bool Blocked { get; set; }
+    public List<ValidationResult> Results { get; set; } = new();
+    public List<string> Redactions { get; set; } = new();
+    public string? Notes { get; set; }
+}
+#endregion
+
+#region RegistrationValidator
+public class RegistrationValidator
+{
+    private static readonly ValidatorPolicy POLICY = ValidatorPolicy.Default();
+    public RegistrationValidationResponse Validate(Dictionary<string, object?> payload)
+    {
+        var resp = new RegistrationValidationResponse();
+        var raw = System.Text.Json.JsonSerializer.Serialize(payload);
+        var (redactedStr, redactions) = RedactPII(raw);
+        resp.Redactions.AddRange(redactions);
+
+        // Pre-checks: URLs
+        if (POLICY.PiiPatterns.Url.IsMatch(raw))
+        {
+            resp.Blocked = true;
+            return resp;
+        }
+
+        // Profanity check across string fields
+        foreach (var kv in payload)
+        {
+            if (kv.Value is string s && ContainsProfanity(s))
+            {
+                resp.Results.Add(new ValidationResult { Field = kv.Key, Ok = false, Errors = new List<string> { "contains profanity or disallowed language" } });
+            }
+        }
+
+        // Username
+        if (!payload.TryGetValue("username", out var uobj) || uobj is not string username)
+        {
+            resp.Results.Add(new ValidationResult { Field = "username", Ok = false, Errors = new List<string> { "missing username" } });
+        }
+        else
+        {
+            var v = ValidateUsername(username);
+            resp.Results.Add(new ValidationResult { Field = "username", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { v.Reason }, Normalized = v.Normalized });
+        }
+
+        // Email
+        if (!payload.TryGetValue("email", out var eobj) || eobj is not string email)
+        {
+            resp.Results.Add(new ValidationResult { Field = "email", Ok = false, Errors = new List<string> { "missing email" } });
+        }
+        else
+        {
+            var v = ValidateEmail(email);
+            resp.Results.Add(new ValidationResult { Field = "email", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { "invalid email" }, Normalized = v.Normalized });
+        }
+
+        // Password
+        if (!payload.TryGetValue("password", out var pobj) || pobj is not string password)
+        {
+            resp.Results.Add(new ValidationResult { Field = "password", Ok = false, Errors = new List<string> { "missing password" } });
+        }
+        else
+        {
+            var v = ValidatePassword(password);
+            resp.Results.Add(new ValidationResult { Field = "password", Ok = v.Ok, Errors = v.Ok ? null : v.Reasons, Normalized = null });
+        }
+
+        // FullName
+        if (!payload.TryGetValue("fullName", out var fnameObj) || fnameObj is not string fullName)
+        {
+            resp.Results.Add(new ValidationResult { Field = "fullName", Ok = false, Errors = new List<string> { "missing fullName" } });
+        }
+        else
+        {
+            var v = ValidateName(fullName);
+            resp.Results.Add(new ValidationResult { Field = "fullName", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { v.Reason }, Normalized = v.Normalized });
+        }
+
+        // Phone
+        if (!payload.TryGetValue("phone", out var phoneObj) || phoneObj is not string phone)
+        {
+            resp.Results.Add(new ValidationResult { Field = "phone", Ok = false, Errors = new List<string> { "missing phone" } });
+        }
+        else
+        {
+            var v = ValidatePhone(phone);
+            resp.Results.Add(new ValidationResult { Field = "phone", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { v.Reason }, Normalized = v.Normalized });
+        }
+
+        // DOB
+        if (!payload.TryGetValue("dob", out var dobObj) || dobObj is not string dob)
+        {
+            resp.Results.Add(new ValidationResult { Field = "dob", Ok = false, Errors = new List<string> { "missing dob" } });
+        }
+        else
+        {
+            var v = ValidateDOB(dob);
+            resp.Results.Add(new ValidationResult { Field = "dob", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { v.Reason }, Normalized = v.NormalizedISO });
+        }
+
+        // Aadhar (optional)
+        if (payload.TryGetValue("aadhar", out var aadharObj) && aadharObj is string aadhar)
+        {
+            var v = ValidateAadhar(aadhar);
+            resp.Results.Add(new ValidationResult { Field = "aadhar", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { v.Reason }, Normalized = v.Normalized });
+            if (!v.Ok) resp.Redactions.Add("aadhar_invalid_or_malformed");
+        }
+
+        // SSN (optional)
+        if (payload.TryGetValue("ssn", out var ssnObj) && ssnObj is string ssn)
+        {
+            var v = ValidateSSN(ssn);
+            resp.Results.Add(new ValidationResult { Field = "ssn", Ok = v.Ok, Errors = v.Ok ? null : new List<string> { "invalid SSN format" }, Normalized = v.Normalized });
+        }
+
+        // Address
+        if (!payload.TryGetValue("address", out var addrObj) || addrObj is not string address)
+        {
+            resp.Results.Add(new ValidationResult { Field = "address", Ok = false, Errors = new List<string> { "missing address" } });
+        }
+        else
+        {
+            var a = NormalizeText(address);
+            if (a.Length < 5) resp.Results.Add(new ValidationResult { Field = "address", Ok = false, Errors = new List<string> { "address too short" } });
+            else resp.Results.Add(new ValidationResult { Field = "address", Ok = true, Normalized = a });
+        }
+
+        // Card (optional)
+        if (payload.TryGetValue("card", out var cardObj) && cardObj is string card)
+        {
+            var v = ValidateCreditCard(card);
+            if (v.Ok) resp.Results.Add(new ValidationResult { Field = "card", Ok = true, Normalized = $"<REDACTED_CARD_LAST4:{GetLast4(card)}>" });
+            else resp.Results.Add(new ValidationResult { Field = "card", Ok = false, Errors = new List<string> { "invalid credit card" } });
+        }
+
+        // Final PII check after translation
+        if (resp.Redactions.Count > 0)
+        {
+            // keep redactions
+        }
+
+        resp.Notes = "validation_complete";
+        return resp;
+    }
+
+    private static (string Redacted, List<string> Redactions) RedactPII(string text)
+    {
+        var redactions = new List<string>();
+        var redacted = text;
+        foreach (var kv in ValidatorPolicy.Default().PiiRegexes)
+        {
+            var name = kv.Key;
+            var re = kv.Value;
+            redacted = re.Replace(redacted, m =>
+            {
+                redactions.Add($"{name} redacted");
+                return $"<REDACTED_{name.ToUpper()}>";
+            });
+        }
+        return (redacted, redactions);
+    }
+
+    private static bool ContainsProfanity(string text)
+    {
+        var s = Regex.Replace(text.ToLowerInvariant(), "[^a-z0-9]", "");
+        foreach (var w in ValidatorPolicy.Default().ProfanityList)
+        {
+            var score = FuzzyMatchScore(s, Regex.Replace(w.ToLowerInvariant(), "[^a-z0-9]", ""));
+            if (score >= ValidatorPolicy.Default().ProfanityFuzzyThreshold) return true;
+        }
+        return false;
+    }
+
+    private static (bool Ok, string? Reason, string? Normalized) ValidateUsername(string u)
+    {
+        var norm = u.Trim();
+        if (norm.Length < ValidatorPolicy.Default().UsernameMin || norm.Length > ValidatorPolicy.Default().UsernameMax) return (false, "invalid length", null);
+        var pattern = ValidatorPolicy.Default().UsernamePattern;
+        if (!pattern.IsMatch(norm)) return (false, "invalid characters or structure (must start and end with letter/digit, lowercase only)", null);
+        return (true, null, norm);
+    }
+
+    private static (bool Ok, string? Normalized) ValidateEmail(string email)
+    {
+        var e = email.Trim();
+        var re = new Regex(@"^[^\s@]+@[^\s@]+\.[^\s@]+$");
+        return (re.IsMatch(e), e.ToLowerInvariant());
+    }
+
+    private static (bool Ok, List<string> Reasons, double Entropy) ValidatePassword(string pw)
+    {
+        var reasons = new List<string>();
+        var policy = ValidatorPolicy.Default();
+        if (pw.Length < policy.PasswordMinLength) reasons.Add($"password must be at least {policy.PasswordMinLength} characters");
+        if (policy.RequireUpper && !Regex.IsMatch(pw, "[A-Z]")) reasons.Add("include uppercase letter");
+        if (policy.RequireLower && !Regex.IsMatch(pw, "[a-z]")) reasons.Add("include lowercase letter");
+        if (policy.RequireDigit && !Regex.IsMatch(pw, "[0-9]")) reasons.Add("include digit");
+        if (policy.RequireSymbol && !Regex.IsMatch(pw, "[^A-Za-z0-9]")) reasons.Add("include symbol (e.g. !@#$%)");
+        if (policy.BannedPasswords.Contains(pw.ToLowerInvariant())) reasons.Add("password is too common");
+        var uniqueChars = pw.Distinct().Count();
+        var entropy = Math.Log(Math.Pow(uniqueChars == 0 ? 1 : uniqueChars, pw.Length), 2);
+        if (entropy < 50) reasons.Add("password entropy too low");
+        return (reasons.Count == 0, reasons, entropy);
+    }
+
+    private static (bool Ok, string? Normalized) ValidateName(string name)
+    {
+        var norm = NormalizeText(name);
+        if (string.IsNullOrWhiteSpace(norm) || norm.Length > ValidatorPolicy.Default().NameMax) return (false, null);
+        var re = new Regex(@"^[\p{L}\p{M} '\-\.]{1,100}$", RegexOptions.Singleline);
+        if (!re.IsMatch(norm)) return (false, null);
+        return (true, norm);
+    }
+
+    private static (bool Ok, string? Normalized, string? Reason) ValidatePhone(string phone)
+    {
+        var digits = Regex.Replace(phone, @"[^\d+]", "");
+        var re = new Regex(@"^\+?[1-9]\d{7,14}$");
+        if (!re.IsMatch(digits)) return (false, null, "not valid E.164");
+        return (true, digits, null);
+    }
+
+    private static (bool Ok, string? NormalizedISO, string? Reason) ValidateDOB(string dob)
+    {
+        if (!DateTime.TryParse(dob, out var date)) return (false, null, "invalid date");
+        var now = DateTime.UtcNow;
+        var age = (int)Math.Floor((now - date).TotalDays / 365.25);
+        var policy = ValidatorPolicy.Default();
+        if (age < policy.AgeMin) return (false, null, $"user must be at least {policy.AgeMin}");
+        if (age > policy.AgeMax) return (false, null, "age too large");
+        return (true, date.ToString("yyyy-MM-dd"), null);
+    }
+
+    private static (bool Ok, string? Normalized, string? Reason) ValidateAadhar(string aadhar)
+    {
+        var digits = Regex.Replace(aadhar, @"\s+", "");
+        if (!Regex.IsMatch(digits, @"^\d{12}$")) return (false, null, "invalid aadhar format");
+        return (true, digits, null);
+    }
+
+    private static (bool Ok, string Normalized) ValidateSSN(string ssn)
+    {
+        var ok = Regex.IsMatch(ssn, @"^\d{3}-\d{2}-\d{4}$") || Regex.IsMatch(ssn, @"^\d{9}$");
+        return (ok, Regex.Replace(ssn, @"\D", ""));
+    }
+
+    private static (bool Ok, string Brand) ValidateCreditCard(string cc)
+    {
+        var digits = Regex.Replace(cc, @"\D", "");
+        return (LuhnCheck(digits), GuessCCBrand(digits));
+    }
+
+    private static bool LuhnCheck(string digits)
+    {
+        var sum = 0;
+        var alt = false;
+        for (int i = digits.Length - 1; i >= 0; i--)
+        {
+            var n = digits[i] - '0';
+            if (alt)
+            {
+                n *= 2;
+                if (n > 9) n -= 9;
+            }
+            sum += n;
+            alt = !alt;
+        }
+        return sum % 10 == 0;
+    }
+
+    private static string GuessCCBrand(string digits)
+    {
+        if (Regex.IsMatch(digits, @"^4")) return "Visa";
+        if (Regex.IsMatch(digits, @"^5[1-5]")) return "Mastercard";
+        if (Regex.IsMatch(digits, @"^3[47]")) return "Amex";
+        return "Unknown";
+    }
+
+    private static string GetLast4(string cc) => Regex.Replace(cc, @"\D", "").PadLeft(4, '0').Substring(Math.Max(0, Regex.Replace(cc, @"\D", "").Length - 4));
+
+    private static string NormalizeText(string s) => Regex.Replace(s ?? "", @"\s+", " ").Trim();
+
+    #region Fuzzy Profanity (Levenshtein)
+    private static int Levenshtein(string a, string b)
+    {
+        var dp = new int[a.Length + 1, b.Length + 1];
+        for (int i = 0; i <= a.Length; i++) dp[i, 0] = i;
+        for (int j = 0; j <= b.Length; j++) dp[0, j] = j;
+        for (int i = 1; i <= a.Length; i++)
+        {
+            for (int j = 1; j <= b.Length; j++)
+            {
+                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                dp[i, j] = Math.Min(Math.Min(dp[i - 1, j] + 1, dp[i, j - 1] + 1), dp[i - 1, j - 1] + cost);
+            }
+        }
+        return dp[a.Length, b.Length];
+    }
+
+    private static double FuzzyMatchScore(string a, string b)
+    {
+        var d = Levenshtein(a, b);
+        var maxLen = Math.Max(a.Length, b.Length);
+        if (maxLen == 0) return 1.0;
+        return 1.0 - (double)d / maxLen;
+    }
+    #endregion
+}
+#endregion
+
+#region ValidatorPolicy
+public class ValidatorPolicy
+{
+    public int PasswordMinLength { get; set; }
+    public bool RequireUpper { get; set; }
+    public bool RequireLower { get; set; }
+    public bool RequireDigit { get; set; }
+    public bool RequireSymbol { get; set; }
+    public List<string> BannedPasswords { get; set; } = new();
+    public int UsernameMin { get; set; }
+    public int UsernameMax { get; set; }
+    public Regex UsernamePattern { get; set; } = new(@"^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$");
+    public int NameMax { get; set; }
+    public bool PhoneAllowE164 { get; set; }
+    public int AgeMin { get; set; }
+    public int AgeMax { get; set; }
+    public List<string> ProfanityList { get; set; } = new();
+    public double ProfanityFuzzyThreshold { get; set; }
+    public Dictionary<string, Regex> PiiRegexes { get; set; } = new();
+    public Regex PiiPatterns { get; set; } = new Regex(@"https?://\S+", RegexOptions.IgnoreCase);
+
+    public static ValidatorPolicy Default()
+    {
+        return new ValidatorPolicy
+        {
+            PasswordMinLength = 12,
+            RequireUpper = true,
+            RequireLower = true,
+            RequireDigit = true,
+            RequireSymbol = true,
+            BannedPasswords = new List<string> { "password", "123456", "qwerty", "letmein" },
+            UsernameMin = 3,
+            UsernameMax = 30,
+            NameMax = 100,
+            PhoneAllowE164 = true,
+            AgeMin = 13,
+            AgeMax = 120,
+            ProfanityList = new List<string> { "damn", "shit", "fuck", "stupid" },
+            ProfanityFuzzyThreshold = 0.75,
+            PiiRegexes = new Dictionary<string, Regex>
+            {
+                { "aadhar", new Regex(@"\b\d{4}\s?\d{4}\s?\d{4}\b", RegexOptions.Compiled) },
+                { "ssn", new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled) },
+                { "email", new Regex(@"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", RegexOptions.Compiled) },
+                { "creditcard", new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b", RegexOptions.Compiled) },
+                { "url", new Regex(@"https?://\S+", RegexOptions.Compiled | RegexOptions.IgnoreCase) },
+                { "jwt", new Regex(@"\beyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\b", RegexOptions.Compiled) }
+            }
+        };
+    }
+}
+#endregion
