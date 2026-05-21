@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DART Services - Architecture Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 3px solid #0066cc;
+            padding-bottom: 30px;
+        }
+        
+        h1 {
+            color: #0066cc;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .document-info {
+            background-color: #f0f4f8;
+            padding: 15px;
+            border-left: 4px solid #0066cc;
+            margin-top: 15px;
+            border-radius: 4px;
+        }
+        
+        .document-info p {
+            margin: 5px 0;
+            color: #333;
+        }
+        
+        .toc {
+            background-color: #f9f9f9;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .toc h2 {
+            color: #0066cc;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .toc ol {
+            margin-left: 20px;
+        }
+        
+        .toc li {
+            margin: 8px 0;
+            color: #333;
+        }
+        
+        .diagram-section {
+            page-break-inside: avoid;
+            margin-bottom: 60px;
+            padding: 30px;
+            background-color: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        
+        .diagram-section h2 {
+            color: #0066cc;
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 10px;
+        }
+        
+        .diagram-description {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            color: #333;
+            border-left: 4px solid #0066cc;
+        }
+        
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        
+        .diagram-explanation {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            color: #555;
+            font-size: 0.95em;
+        }
+        
+        .diagram-explanation h3 {
+            color: #0066cc;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .diagram-explanation ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .diagram-explanation li {
+            margin: 8px 0;
+            color: #333;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #999;
+            font-size: 0.9em;
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            
+            .container {
+                max-width: 100%;
+                box-shadow: none;
+                padding: 20px;
+            }
+            
+            .diagram-section {
+                page-break-inside: avoid;
+            }
+            
+            header {
+                page-break-after: avoid;
+            }
+        }
+        
+        .page-break {
+            page-break-after: always;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>DART Services</h1>
+            <p class="subtitle">Complete Architecture Diagrams & System Documentation</p>
+            <div class="document-info">
+                <p><strong>Project:</strong> DART Services (Deal Assessment and Reporting Technology)</p>
+                <p><strong>Technology Stack:</strong> ASP.NET Web API 5.2.3, .NET Framework 4.8, Oracle Database</p>
+                <p><strong>Document Version:</strong> 1.0</p>
+                <p><strong>Date:</strong> January 15, 2024</p>
+                <p><strong>Organization:</strong> HP Inc.</p>
+            </div>
+        </header>
+
+        <!-- Table of Contents -->
+        <div class="toc">
+            <h2>📑 Table of Contents</h2>
+            <ol>
+                <li>Component Architecture Diagram</li>
+                <li>N-Tier Layer Architecture Diagram</li>
+                <li>Deal Request Data Flow Diagram</li>
+                <li>Deal Catalog API Sequence Diagram</li>
+                <li>Script Generation & Scheduling Sequence Diagram</li>
+                <li>Production Deployment Architecture Diagram</li>
+                <li>System Flow Documentation</li>
+            </ol>
+        </div>
+
+        <!-- Diagram 1: Component Architecture -->
+        <div class="diagram-section">
+            <h2>1. Component Architecture Diagram</h2>
+            <div class="diagram-description">
+                <strong>Purpose:</strong> Shows all major components and their interactions in the DART Services system, including controllers, repositories, database managers, and external integrations.
+            </div>
+            <div class="mermaid">
+graph TB
+    Client["DartServicesClient<br/>ASP.NET Web Forms"]
+    API["DartServices<br/>ASP.NET Web API"]
+    Auth["DartAuthHttpModule<br/>Authentication"]
+    Deal["DealController<br/>& Repository"]
+    Notif["NotificationController<br/>& Repository"]
+    Script["ScriptorController<br/>& Repository"]
+    DB["OracleDBManager<br/>Data Access"]
+    Cache["SqlCacheManager<br/>Query Cache"]
+    Oracle["Oracle Database<br/>DARTWWI"]
+    Logger["log4net<br/>Logging"]
+    LDAP["Active Directory<br/>& LDAP"]
+    
+    Client -->|HTTP/HTTPS| API
+    API -->|All Requests| Auth
+    Auth -->|Validate Token| LDAP
+    Auth -->|Route| Deal
+    Auth -->|Route| Notif
+    Auth -->|Route| Script
+    Deal -->|Query/Execute| DB
+    Notif -->|Query/Execute| DB
+    Script -->|Query/Execute| DB
+    DB -->|Check Cache| Cache
+    DB -->|Execute SQL| Oracle
+    API -->|Log Events| Logger
+    Auth -->|Log Auth Events| Logger
+    DB -->|Log DB Ops| Logger
+            </div>
+            <div class="diagram-explanation">
+                <h3>Key Components:</h3>
+                <ul>
+                    <li><strong>DartServicesClient:</strong> Web Forms UI for user interaction</li>
+                    <li><strong>DartServices API:</strong> REST API endpoints via ASP.NET Web API</li>
+                    <li><strong>DartAuthHttpModule:</strong> Intercepts and validates HTTP requests</li>
+                    <li><strong>Controllers:</strong> Three main API endpoints (Deal, Notification, Scripter)</li>
+                    <li><strong>Repositories:</strong> Business logic and data operations</li>
+                    <li><strong>OracleDBManager:</strong> Database connection pooling and query execution</li>
+                    <li><strong>SqlCacheManager:</strong> In-memory query result caching</li>
+                    <li><strong>log4net:</strong> Centralized logging across all layers</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Diagram 2: N-Tier Architecture -->
+        <div class="diagram-section">
+            <h2>2. N-Tier Layer Architecture Diagram</h2>
+            <div class="diagram-description">
+                <strong>Purpose:</strong> Illustrates the layered architecture from user interface down to database, showing data flow between layers.
+            </div>
+            <div class="mermaid">
+graph LR
+    A["Presentation Layer<br/>DartServicesClient"]
+    B["API Layer<br/>DartServices Controllers"]
+    C["Business Logic Layer<br/>Repositories & Models"]
+    D["Data Access Layer<br/>OracleDBManager"]
+    E["Database Layer<br/>Oracle Database"]
+    
+    A -->|REST Calls| B
+    B -->|Business Operations| C
+    C -->|CRUD Operations| D
+    D -->|SQL Execution| E
+    E -->|Query Results| D
+    D -->|Data Objects| C
+    C -->|Response Objects| B
+    B -->|JSON/XML| A
+    
+    style A fill:#e1f5ff
+    style B fill:#b3e5fc
+    style C fill:#81d4fa
+    style D fill:#4fc3f7
+    style E fill:#29b6f6
+            </div>
+            <div class="diagram-explanation">
+                <h3>Layer Responsibilities:</h3>
+                <ul>
+                    <li><strong>Presentation:</strong> User interface (ASPX pages, forms)</li>
+                    <li><strong>API:</strong> REST endpoints and HTTP routing</li>
+                    <li><strong>Business Logic:</strong> Repositories handling core operations</li>
+                    <li><strong>Data Access:</strong> Oracle connection and query execution</li>
+                    <li><strong>Database:</strong> Oracle 11g/12c persistence storage</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Diagram 3: Deal Request Data Flow -->
+        <div class="diagram-section">
+            <h2>3. Deal Request Data Flow Diagram</h2>
+            <div class="diagram-description">
+                <strong>Purpose:</strong> Demonstrates the complete flow of a deal-related API request from client through authentication, validation, database query, and response generation.
+            </div>
+            <div class="mermaid">
+graph TD
+    Start["Client Initiates Deal Request"]
+    Start --> Auth["DartAuthHttpModule<br/>Authenticate User"]
+    Auth --> Validate{"Validate<br/>JWT Token?"}
+    Validate -->|Invalid| Error1["Return 401 Unauthorized"]
+    Validate -->|Valid| Check{"Check User<br/>Permissions?"}
+    Check -->|No Permission| Error2["Return 403 Forbidden"]
+    Check -->|Has Permission| Route["Route to DealController"]
+    Route --> Controller["DealController.GetPmpsCatalog()"]
+    Controller --> Repo["DealRepository.GetPmps..()"]
+    Repo --> ValidateIn["Validate Input Data"]
+    ValidateIn --> Cache["Check SqlCacheManager"]
+    Cache -->|Cached| Return1["Return Cached Data"]
+    Cache -->|Not Cached| Query["Build SQL Query"]
+    Query --> DB["OracleDbManager.Query()"]
+    DB --> Oracle["Execute on Oracle DB"]
+    Oracle --> Map["Map Results to Objects"]
+    Map --> Cache2["Update Cache"]
+    Cache2 --> Format["Format Response<br/>JSON/XML"]
+    Format --> Response["Return HttpResponseMessage"]
+    Response --> End["Response to Client"]
+    Return1 --> End
+    Error1 --> End
+    Error2 --> End
+            </div>
+            <div class="diagram-explanation">
+                <h3>Process Flow Steps:</h3>
+                <ul>
+                    <li><strong>1. Authentication:</strong> User credentials validated via JWT or Basic Auth</li>
+                    <li><strong>2. Authorization:</strong> User permissions checked against database</li>
+                    <li><strong>3. Routing:</strong> Request routed to appropriate controller</li>
+                    <li><strong>4. Validation:</strong> Input parameters validated against business rules</li>
+                    <li><strong>5. Cache Check:</strong> Query result cache checked first</li>
+                    <li><strong>6. Database:</strong> SQL executed on Oracle if not cached</li>
+                    <li><strong>7. Formatting:</strong> Results formatted as JSON or XML</li>
+                    <li><strong>8. Response:</strong> HTTP response sent to client</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Diagram 4: Sequence Diagram - Deal Catalog -->
+        <div class="diagram-section">
+            <h2>4. Deal Catalog API Sequence Diagram</h2>
+            <div class="diagram-description">
+                <strong>Purpose:</strong> Detailed sequence of interactions when requesting a PMPS catalog for a specific country, showing the exact order of method calls and data exchanges.
+            </div>
+            <div class="mermaid">
+sequenceDiagram
+    Client->>DartServices: GET /api/deal/GetPmpsCatalogForCountry?code=US
+    DartServices->>DartAuthHttpModule: OnAuthenticateRequest()
+    DartAuthHttpModule->>LDAP: Validate HTTP Basic Auth
+    LDAP-->>DartAuthHttpModule: Auth Result
+    DartAuthHttpModule->>DealDb: IsValidUser(userId, serviceName)
+    DealDb->>OracleDB: Query DART_APP_CONFIG_KEYS
+    OracleDB-->>DealDb: Permission Data
+    DealDb-->>DartAuthHttpModule: User Valid
+    DartAuthHttpModule->>DealController: Route to controller
+    DealController->>DealRepository: GetPmpsCatalogForCountry(code)
+    DealRepository->>DealDb: ValidateCountryCode(code)
+    DealDb->>SqlCacheManager: Check Cache
+    SqlCacheManager-->>DealDb: Cache Miss
+    DealDb->>OracleDbManager: Query(sql, params)
+    OracleDbManager->>OracleDB: Execute SQL + Stored Proc
+    OracleDB-->>OracleDbManager: ResultSet
+    OracleDbManager->>DealDb: DataTable
+    DealDb->>SqlCacheManager: Update Cache
+    DealDb-->>DealRepository: XML Data
+    DealRepository-->>DealController: XmlDocument
+    DealController->>DealController: CreateResponse(XML)
+    DealController-->>DartServices: HttpResponseMessage
+    DartServices-->>Client: 200 OK + XML Payload
+            </div>
+            <div class="diagram-explanation">
+                <h3>Sequence Summary:</h3>
+                <ul>
+                    <li><strong>Authentication Phase:</strong> HTTP module intercepts and validates credentials</li>
+                    <li><strong>Authorization Phase:</strong> Database checked for user permissions</li>
+                    <li><strong>Routing Phase:</strong> Request routed to DealController</li>
+                    <li><strong>Validation Phase:</strong> Country code validated against reference data</li>
+                    <li><strong>Caching Phase:</strong> Cache checked for existing results</li>
+                    <li><strong>Database Phase:</strong> Oracle query executed with parameters</li>
+                    <li><strong>Response Phase:</strong> Results formatted and returned to client</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Diagram 5: Script Generation Sequence -->
+        <div class="diagram-section">
+            <h2>5. Script Generation & Scheduling Sequence Diagram</h2>
+            <div class="diagram-description">
+                <strong>Purpose:</strong> Shows the complete workflow for generating and scheduling a procurement script, including validation, script building, and queue insertion.
+            </div>
+            <div class="mermaid">
+sequenceDiagram
+    Client->>ScriptorController: POST /api/scriptor/GenerateScript
+    ScriptorController->>ScriptorRepository: GenerateAndScheduleScript(input)
+    ScriptorRepository->>ScriptorRepository: ValidateInput(DealInfo)
+    ScriptorRepository->>DealDb: ValidateCountryCode()
+    DealDb-->>ScriptorRepository: Valid
+    ScriptorRepository->>DealDb: ValidateCurrencyCode()
+    DealDb-->>ScriptorRepository: Valid
+    ScriptorRepository->>ScriptorRepository: BuildScript()
+    ScriptorRepository->>DealRepository: GetPmpsServices()
+    DealRepository->>OracleDbManager: Query()
+    OracleDbManager->>OracleDB: Execute Query
+    OracleDB-->>OracleDbManager: ServiceData
+    OracleDbManager-->>DealRepository: DataTable
+    DealRepository-->>ScriptorRepository: ServiceList
+    ScriptorRepository->>ScriptorRepository: GenerateSQLScript()
+    ScriptorRepository->>DealRepository: ScheduleScript()
+    DealRepository->>DealDb: InsertDealScriptInQueue()
+    DealDb->>OracleDbManager: ExecuteNonQuery()
+    OracleDbManager->>OracleDB: INSERT INTO Queue Table
+    OracleDB-->>OracleDbManager: Success
+    OracleDbManager-->>DealDb: Rows Affected
+    DealDb->>DealDb: InsertDARTServiceLog()
+    DealDb->>OracleDB: Log Service Call
+    DealDb-->>DealRepository: Logged
+    DealRepository-->>ScriptorRepository: ScheduleResult
+    ScriptorRepository-->>ScriptorController: HttpResponseMessage
+    ScriptorController-->>Client: 200 OK + Script ID
+            </div>
+            <div class="diagram-explanation">
+                <h3>Script Generation Workflow:</h3>
+                <ul>
+                    <li><strong>1. Input Validation:</strong> All deal parameters validated</li>
+                    <li><strong>2. Reference Data Check:</strong> Country and currency codes verified</li>
+                    <li><strong>3. Script Building:</strong> Dynamic script generated based on inputs</li>
+                    <li><strong>4. PMPS Integration:</strong> Service data retrieved from PMPS system</li>
+                    <li><strong>5. SQL Generation:</strong> SQL script created for procurement</li>
+                    <li><strong>6. Queue Insertion:</strong> Script inserted into execution queue</li>
+                    <li><strong>7. Audit Logging:</strong> Service call logged for compliance</li>
+                    <li><strong>8. Response:</strong> Script ID returned to client</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Diagram 6: Deployment Architecture -->
+        <div class="diagram-section">
+            <h2>6. Production Deployment Architecture Diagram</h2>
+            <div class="diagram-description">
+                <strong>Purpose:</strong> Illustrates the production deployment with load balancers, multiple IIS servers, caching layer, Oracle database with failover, and supporting services.
+            </div>
+            <div class="mermaid">
+graph TB
+    LB["Load Balancer<br/>SSL/TLS Termination"]
+    
+    subgraph Prod["Production IIS Servers"]
+        IIS1["IIS Server 1<br/>DartServices API"]
+        IIS2["IIS Server 2<br/>DartServices API"]
+        IIS3["IIS Server 3<br/>DartServicesClient UI"]
+    end
+    
+    subgraph AppCache["Application Layer"]
+        Cache["Distributed Cache<br/>SqlCacheManager"]
+    end
+    
+    subgraph DB["Oracle Database Tier"]
+        DBPrim["Oracle Primary<br/>DARTWWI"]
+        DBStandby["Oracle Standby<br/>DARTWWI"]
+    end
+    
+    subgraph Services["Supporting Services"]
+        AD["Active Directory<br/>Authentication"]
+        LDAP["LDAP Server<br/>User Lookup"]
+        Monitor["Monitoring<br/>Health Checks"]
+    end
+    
+    LB -->|HTTP| IIS1
+    LB -->|HTTP| IIS2
+    LB -->|HTTP| IIS3
+    
+    IIS1 --> Cache
+    IIS2 --> Cache
+    IIS3 --> Cache
+    
+    Cache --> DBPrim
+    DBPrim --> DBStandby
+    
+    IIS1 --> AD
+    IIS2 --> AD
+    IIS3 --> LDAP
+    
+    Monitor -.->|Health Check| IIS1
+    Monitor -.->|Health Check| IIS2
+    Monitor -.->|Health Check| DBPrim
+    
+    style LB fill:#ff9999
+    style Prod fill:#99ccff
+    style AppCache fill:#99ff99
+    style DB fill:#ffcc99
+    style Services fill:#ffddaa
+            </div>
+            <div class="diagram-explanation">
+                <h3>Deployment Architecture Components:</h3>
+                <ul>
+                    <li><strong>Load Balancer:</strong> Distributes incoming traffic across IIS servers with SSL/TLS termination</li>
+                    <li><strong>IIS Servers:</strong> Multiple instances for API and UI with horizontal scaling</li>
+                    <li><strong>Distributed Cache:</strong> SqlCacheManager for distributed query result caching</li>
+                    <li><strong>Database Tier:</strong> Oracle Primary-Standby configuration for high availability</li>
+                    <li><strong>Active Directory:</strong> Windows authentication and user management</li>
+                    <li><strong>LDAP Server:</strong> Alternative user lookup and validation</li>
+                    <li><strong>Monitoring:</strong> Health checks for automatic failover</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Key Architecture Insights Section -->
+        <div class="diagram-section">
+            <h2>7. System Architecture Summary</h2>
+            <div class="diagram-description">
+                This section summarizes the key architectural decisions and their rationale.
+            </div>
+            
+            <div class="diagram-explanation">
+                <h3>Architectural Patterns Applied:</h3>
+                <ul>
+                    <li><strong>N-Tier Layered Architecture:</strong> Separation of concerns with distinct layers for presentation, API, business logic, and data access</li>
+                    <li><strong>Repository Pattern:</strong> Abstraction of data access logic into repository classes (DealRepository, NotificationRepository, ScriptorRepository)</li>
+                    <li><strong>Singleton Pattern:</strong> OracleDBManager implemented as singleton for efficient connection pooling</li>
+                    <li><strong>HTTP Module Pattern:</strong> DartAuthHttpModule intercepts all HTTP requests for centralized authentication</li>
+                    <li><strong>Factory Pattern:</strong> OracleDbManager.GetInstance() for object creation</li>
+                    <li><strong>Caching Strategy:</strong> SqlCacheManager provides in-memory caching with background refresh</li>
+                </ul>
+            </div>
+            
+            <div class="diagram-explanation">
+                <h3>Technology Stack:</h3>
+                <ul>
+                    <li><strong>Frontend:</strong> ASP.NET Web Forms (.NET Framework 4.5.1)</li>
+                    <li><strong>API:</strong> ASP.NET Web API 5.2.3 (.NET Framework 4.8)</li>
+                    <li><strong>Database:</strong> Oracle 11g/12c with ODP.NET managed driver</li>
+                    <li><strong>Logging:</strong> log4net with rolling file appender</li>
+                    <li><strong>Serialization:</strong> Newtonsoft.Json (JSON.NET)</li>
+                    <li><strong>Authentication:</strong> Windows Active Directory, LDAP, JWT tokens</li>
+                    <li><strong>File Transfer:</strong> WinSCP for secure file operations</li>
+                </ul>
+            </div>
+            
+            <div class="diagram-explanation">
+                <h3>Key Design Principles:</h3>
+                <ul>
+                    <li><strong>Separation of Concerns:</strong> Each layer has well-defined responsibilities</li>
+                    <li><strong>DRY (Don't Repeat Yourself):</strong> Common functionality centralized in utility classes</li>
+                    <li><strong>Security First:</strong> Authentication and authorization implemented at HTTP module level</li>
+                    <li><strong>Performance Optimization:</strong> Caching and connection pooling for scalability</li>
+                    <li><strong>Auditability:</strong> Comprehensive logging and service call tracking</li>
+                    <li><strong>Fault Tolerance:</strong> Error handling and database failover capabilities</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>DART Services - Architecture Diagrams Documentation</p>
+            <p>Version 1.0 | Generated on January 15, 2024</p>
+            <p>© 2024 HP Inc. All rights reserved.</p>
+            <p style="margin-top: 20px; font-size: 0.85em;">
+                <strong>For Questions or Support:</strong> ssitdartipc@hp.com
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    </script>
+</body>
+</html>
